@@ -40,6 +40,7 @@ enum ProductType {
 interface StockManagement {
     void addProduct(Product product);
     void removeProduct(Product product);
+    String displayProducts(List<Product> products);
 }
 
 interface ProductSearch {
@@ -61,10 +62,12 @@ interface Rewardable {
 //GROCERY STORE
 class GroceryStore implements StockManagement, ProductSearch {
     List<Product> productStock;
+    List<Product> currentList;
     Map<ProductType, List<Product>> productFilter;
 
     GroceryStore(){
         this.productStock = new ArrayList<>();
+        this.currentList = new ArrayList<>();
 
         this.productFilter = new HashMap<>();
         this.productFilter.put(ProductType.FRUIT, new ArrayList<>());
@@ -143,6 +146,7 @@ class GroceryStore implements StockManagement, ProductSearch {
             for (int i = 0; i < products.size(); i++) {
             list += "\n" + (i+1) + ". " + products.get(i);          //creates a numbered list of each product
             }
+            this.currentList = products;
         } else {
             list += "\n" + "No products available.";                //if the list is empty, notifies
         }
@@ -159,6 +163,25 @@ class GroceryStore implements StockManagement, ProductSearch {
         this.productStock.remove(product);
 
         this.productFilter.get(product.productType).remove(product);
+    }
+
+    public void makeSelection(User user){
+         displayProducts(this.currentList);
+        while (true){
+            System.out.println("Make selection");
+            int choice = In.nextInt();
+            if (choice > 0 && choice <= this.currentList.size()){
+            user.getCart().addProduct(this.currentList.get(choice -1));
+            System.out.println("Selected " + this.currentList.get(choice -1).getProductName());
+
+            System.out.println("  Cart size: " + user.getCart().getCartSize());
+            System.out.println("  Cart cost: " + user.getCart().getCartPrice());
+            System.out.println("  Cart points: " + user.getCart().getCartPoints());
+            break;
+            } else {
+                System.out.println("Invalid selection");
+            }
+        }
     }
 
     void populateStock(){                       // Populates groceryStore object
@@ -241,7 +264,87 @@ class ShoppingCart {
     public User getOwner(){
         return this.owner;
     }
+
+    public Product getProduct(int i){
+        return this.cart.get(i);
+    }
+
+    public String displayProducts(List<Product> products){
+       String list = "";                                           
+        if (products.size() > 0){
+            for (int i = 0; i < products.size(); i++) {
+            list += "\n" + (i+1) + ". " + products.get(i);          
+            }
+        } else {
+            list += "\n" + "Cart is empty.";                
+        }
+        return list;
+    }
+
+    public void addProduct(Product product){
+        this.cart.add(product);
+        
+        if (product instanceof RewardProduct){
+            addReward((RewardProduct) product);
+        }
+        
+        addCost(product);
+    }
+
+    public void addCost(Product product){
+        this.cartPrice += product.getProductCost();
+    }
+
+    public void addReward(RewardProduct product){
+        this.cartPoints += product.getRewardValue();
+    }
+
+    public void deductReward(RewardProduct product){
+        this.cartPoints -= product.getRewardValue();
+
+        if (this.cartPoints < 0){
+            this.cartPoints = 0;
+        }
+    }
+
+    public void removeProduct(){
+        System.out.println(displayProducts(this.cart));
+        System.out.println("Which product would you like to remove?");
+        int i = In.nextInt();
+        if (i > 0 && i <= getCartSize()){
+            if (this.cart.get(i-1) instanceof RewardProduct) {
+                deductReward((RewardProduct) this.cart.get(i-1));
+            }
+            this.cartPrice -= this.cart.get(i-1).getProductCost();
+            this.cart.remove((i-1));
+        } else {
+            System.out.println("Invalid selection.");
+        }
+    }
+    
+    public void checkout() {
+        if (getCartSize() <= 0) {
+            System.out.println("Cart has no items.");
+        } else {
+            String cartList = "";
+            int i = 0;
+            for (Product cart : this.cart){
+                cartList += cart.getProductName();
+                i++;
+                while (i > 0 && i < getCartSize() -2){
+                    cartList += ", ";
+                }
+                System.out.println("You are checking out: " + cartList + ". Your total is: " + cartPrice
+                        + ". Thank you for shopping with us.");
+                        for (int ii = getCartSize()-1; ii >= 0; ii--){
+                    this.cart.remove(ii);
+                    this.cartPrice = 0;
+                }
+            }
+        }
+    }
 }
+
 
 
 
@@ -268,6 +371,14 @@ class User {
 
     public String getName() {
         return this.name;
+    }
+
+    public ShoppingCart getCart() {
+        return this.shoppingCart;
+    }
+
+    public List<Product> getCartList() {
+        return this.shoppingCart.cart;
     }
 
     protected void setName(String name){
@@ -314,6 +425,16 @@ class Menu {
             int choice = In.nextInt();
             if (choice == 1) {
                 System.out.println(groceryStore.searchProducts());
+                System.out.println("Purchase products?");
+                System.out.println("  1. Yes\n  2. No");
+                choice = In.nextInt();
+                if (choice == 1){
+                    groceryStore.makeSelection(user);
+                } else if (choice == 2){
+                    break;
+                } else {
+                    System.out.println("Invalid option.");
+                }
             } else if (choice == 2) {
                 System.out.println("  Blank");
             } else if (choice == 3) {
@@ -336,9 +457,42 @@ class Menu {
             System.out.println("  3. Back to main menu");
             int choice = In.nextInt();
             if (choice == 1) {
-                System.out.println("  Unfinished");
+                runUserCart(user, groceryStore);
             } else if (choice == 2) {
                 System.out.println(user.toString());
+            } else if (choice == 3) {
+                break;
+            } else {
+                System.out.println("Pick an option 1, 2, or 3");
+            }
+        }
+        System.out.println("Back to main menu...");
+    }
+
+    void runUserCart(User user, GroceryStore groceryStore) {
+        System.out.println("--- Your Cart ---");
+        while (true) {
+            System.out.println("Select an option:");
+            System.out.println("  1. Review cart");
+            System.out.println("  2. Pay for cart");
+            System.out.println("  3. Back to main menu");
+            int choice = In.nextInt();
+            if (choice == 1) {
+                System.out.println(user.getCart().displayProducts(user.getCartList()));
+                if (user.getCart().getCartSize() > 0){
+                    System.out.println("Remove products?");
+                System.out.println("  1. Yes\n  2. No");
+                choice = In.nextInt();
+                if (choice == 1){
+                    user.getCart().removeProduct();
+                } else if (choice == 2){
+                    System.out.println("");
+                } else {
+                    System.out.println("Invalid option.");
+                }
+            }
+            } else if (choice == 2) {
+                user.getCart().checkout();
             } else if (choice == 3) {
                 break;
             } else {
@@ -377,7 +531,7 @@ class Product {
     }
 
     public String toString(){
-        return this.productName + "($" + this.productCost + ")";
+        return this.productName + " ($" + this.productCost + ")";
     }
 
     public String getProductName(){
@@ -405,7 +559,7 @@ class DiscountProduct extends Product {
 
     @Override
     public String toString(){
-        return this.productName + "($" + this.discountPrice + ")";
+        return this.productName + " ($" + this.discountPrice + ")";
     }
 
     @Override
@@ -424,7 +578,7 @@ class RewardProduct extends Product implements Rewardable {
 
     @Override
     public String toString(){
-        return this.productName + "($" + this.productCost + ")" + " +" + this.rewardValue + " Reward Points";
+        return this.productName + " ($" + this.productCost + ")" + " +" + this.rewardValue + " Reward Points";
     }
 
     public int getRewardValue(){
