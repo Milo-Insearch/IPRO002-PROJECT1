@@ -62,10 +62,12 @@ interface Rewardable {
 //GROCERY STORE
 class GroceryStore implements StockManagement, ProductSearch {
     List<Product> productStock;
+    List<Product> currentList;
     Map<ProductType, List<Product>> productFilter;
 
     GroceryStore(){
         this.productStock = new ArrayList<>();
+        this.currentList = new ArrayList<>();
 
         this.productFilter = new HashMap<>();
         this.productFilter.put(ProductType.FRUIT, new ArrayList<>());
@@ -144,6 +146,7 @@ class GroceryStore implements StockManagement, ProductSearch {
             for (int i = 0; i < products.size(); i++) {
             list += "\n" + (i+1) + ". " + products.get(i);          //creates a numbered list of each product
             }
+            this.currentList = products;
         } else {
             list += "\n" + "No products available.";                //if the list is empty, notifies
         }
@@ -160,6 +163,25 @@ class GroceryStore implements StockManagement, ProductSearch {
         this.productStock.remove(product);
 
         this.productFilter.get(product.productType).remove(product);
+    }
+
+    public void makeSelection(User user){
+         displayProducts(this.currentList);
+        while (true){
+            System.out.println("Make selection");
+            int choice = In.nextInt();
+            if (choice > 0 && choice <= this.currentList.size()){
+            user.getCart().addProduct(this.currentList.get(choice -1));
+            System.out.println("Selected " + this.currentList.get(choice -1).getProductName());
+
+            System.out.println("  Cart size: " + user.getCart().getCartSize());
+            System.out.println("  Cart cost: " + user.getCart().getCartPrice());
+            System.out.println("  Cart points: " + user.getCart().getCartPoints());
+            break;
+            } else {
+                System.out.println("Invalid selection");
+            }
+        }
     }
 
     void populateStock(){                       // Populates groceryStore object
@@ -301,16 +323,18 @@ class ShoppingCart {
     }
     
     public void checkout() {
-        if (this.cart.size() <= 0) {
+        if (getCartSize() <= 0) {
             System.out.println("Cart has no items.");
         } else {
-            String cartItems = "";
-            for (int i = 0; i < this.cart.size(); i++) {
-                cartItems += this.cart.get(i).getProductName();
-                if (i < this.cart.size() - 1) {
-                    cartItems += ", ";
+            String cartList = "";
+            int i = 0;
+            for (Product cart : this.cart){
+                cartList += cart.getProductName();
+                i++;
+                while (i > 0 && i < getCartSize() -2){
+                    cartList += ", ";
                 }
-                System.out.println("You are checking out: " + cartItems + ". Your total is: " + cartPrice
+                System.out.println("You are checking out: " + cartList + ". Your total is: " + cartPrice
                         + ". Thank you for shopping with us.");
                         for (int ii = getCartSize()-1; ii >= 0; ii--){
                     this.cart.remove(ii);
@@ -401,6 +425,16 @@ class Menu {
             int choice = In.nextInt();
             if (choice == 1) {
                 System.out.println(groceryStore.searchProducts());
+                System.out.println("Purchase products?");
+                System.out.println("  1. Yes\n  2. No");
+                choice = In.nextInt();
+                if (choice == 1){
+                    groceryStore.makeSelection(user);
+                } else if (choice == 2){
+                    break;
+                } else {
+                    System.out.println("Invalid option.");
+                }
             } else if (choice == 2) {
                 System.out.println("  Blank");
             } else if (choice == 3) {
@@ -445,8 +479,9 @@ class Menu {
             int choice = In.nextInt();
             if (choice == 1) {
                 System.out.println(user.getCart().displayProducts(user.getCartList()));
-                System.out.println("Remove products?");
-                System.out.println(  "1. Yes\n  2. No");
+                if (user.getCart().getCartSize() > 0){
+                    System.out.println("Remove products?");
+                System.out.println("  1. Yes\n  2. No");
                 choice = In.nextInt();
                 if (choice == 1){
                     user.getCart().removeProduct();
@@ -455,6 +490,7 @@ class Menu {
                 } else {
                     System.out.println("Invalid option.");
                 }
+            }
             } else if (choice == 2) {
                 user.getCart().checkout();
             } else if (choice == 3) {
